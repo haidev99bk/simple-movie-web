@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        helveticaNeue: ['"Helvetica Neue"', "sans-serif"],
+        helvetica: ["Helvetica Neue", "sans-serif"],
       },
     },
   },
