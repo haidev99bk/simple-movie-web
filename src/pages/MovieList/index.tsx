@@ -3,10 +3,10 @@ import movieService from "../../service/movie.service";
 
 const MovieList = () => {
   useEffect(() => {
-    movieService.getMovies();
+    movieService.searchMovies();
   }, []);
 
-  return <div>MovieList</div>;
+  return <div className="font-helveticaNeue">MovieList</div>;
 };
 
 export default MovieList;
