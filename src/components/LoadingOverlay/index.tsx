@@ -1,5 +1,3 @@
-import React from "react";
-
 const LoadingOverlay = () => {
   return (
     <div className="absolute bg-black bg-opacity-40 z-10 h-[calc(100%-50px)] w-full flex items-center justify-center">
