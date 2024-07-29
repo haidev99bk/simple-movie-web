@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Logo from "../../assets/logo.png";
 import MenuIcon from "../../assets/menu-icon.gif";

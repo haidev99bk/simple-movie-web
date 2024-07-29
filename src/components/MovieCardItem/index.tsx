@@ -1,4 +1,3 @@
-import React from "react";
 import { MovieListItem } from "../../service/movie.service";
 
 interface MovieCardItemProps {

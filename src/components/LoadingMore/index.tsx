@@ -1,5 +1,3 @@
-import React from "react";
-
 const LoadingMore = () => {
   return (
     <div className="w-fit flex items-center gap-1 text-sm">

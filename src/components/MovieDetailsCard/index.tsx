@@ -1,4 +1,3 @@
-import React from "react";
 import { MovieDetails } from "../../service/movie.service";
 
 interface MovieDetailsCardProps {
