@@ -1,5 +1,6 @@
 import React, {
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -10,15 +11,47 @@ import Search from "../../components/Search";
 import { throttle } from "lodash";
 import LoadingMore from "../../components/LoadingMore";
 import MovieCardItem from "../../components/MovieCardItem";
+import { SessionStorageKeys } from "../../constants/sessionStoreKeys";
+import { RouterPaths } from "../../routers";
+import { useNavigate } from "react-router-dom";
+import GlobalContext from "../../context/global";
 
 const MAX_PAGE = 100;
 
 const MovieList = () => {
-  const [searchTitle, setSearchTitle] = useState("");
-  const [movieList, setMovieList] = useState<MovieListItem[]>([]);
+  const { globalAction } = useContext(GlobalContext);
+  const navigate = useNavigate();
+
+  const cached = useMemo(() => {
+    const searchTitle =
+      sessionStorage.getItem(SessionStorageKeys.SEARCH_TITLE) !== "undefined"
+        ? JSON.parse(
+            sessionStorage.getItem(SessionStorageKeys.SEARCH_TITLE) as string
+          )
+        : "";
+
+    const totalResultsFound =
+      sessionStorage.getItem(SessionStorageKeys.TOTAL_FOUND) !== "undefined"
+        ? JSON.parse(
+            sessionStorage.getItem(SessionStorageKeys.TOTAL_FOUND) as string
+          )
+        : "";
+
+    const movieList =
+      sessionStorage.getItem(SessionStorageKeys.MOVIE_LIST) !== "undefined"
+        ? JSON.parse(
+            sessionStorage.getItem(SessionStorageKeys.MOVIE_LIST) as string
+          )
+        : "";
+
+    return { searchTitle, totalResultsFound, movieList };
+  }, [location.pathname]);
+
+  const [searchTitle, setSearchTitle] = useState(cached.searchTitle || "");
+  const [movieList, setMovieList] = useState<MovieListItem[]>(cached.movieList);
   const [totalResultsFound, setTotalResultsFound] = useState<
     number | undefined
-  >(0);
+  >(Number(cached.totalResultsFound) || 0);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -26,39 +59,78 @@ const MovieList = () => {
 
   const moveListContainerRef = useRef<HTMLDivElement>(null);
 
+  const cacheData = () => {
+    sessionStorage.setItem(
+      SessionStorageKeys.MOVIE_LIST,
+      JSON.stringify(movieList)
+    );
+
+    sessionStorage.setItem(
+      SessionStorageKeys.SEARCH_TITLE,
+      JSON.stringify(searchTitle)
+    );
+
+    sessionStorage.setItem(
+      SessionStorageKeys.TOTAL_FOUND,
+      JSON.stringify(totalResultsFound)
+    );
+  };
+
+  const clearCache = () => {
+    sessionStorage.removeItem(SessionStorageKeys.MOVIE_LIST);
+
+    sessionStorage.removeItem(SessionStorageKeys.SEARCH_TITLE);
+
+    sessionStorage.removeItem(SessionStorageKeys.TOTAL_FOUND);
+  };
+
+  const onClickCard = (id: string) => {
+    navigate(`${RouterPaths.MOVIE_DETAILS}/${id}`);
+  };
+
   const onSearchChange = (title: string) => {
     setSearchTitle(title);
+    setMovieList([]);
     setTotalResultsFound(undefined);
     setError("");
+    clearCache();
   };
 
   const onSearch = async (searchTitle: string, page = 1) => {
     if (searchTitle) {
-      const result = await movieService.searchMovies(searchTitle, page);
+      try {
+        const result = await movieService.searchMovies(searchTitle, page);
 
-      if (result?.Response === "False") {
-        if (result?.Error) {
-          setError(result.Error);
-        }
-      } else {
-        if (result?.Search?.length > 0) {
-          if (page > 1) {
-            setMovieList((prev) => [...prev, ...result.Search]);
-          } else {
-            setMovieList([...result.Search]);
+        if (result?.Response === "False") {
+          if (result?.Error) {
+            setError(result.Error);
+          }
+        } else {
+          if (result?.Search?.length > 0) {
+            if (page > 1) {
+              setMovieList((prev) => [...prev, ...result.Search]);
+            } else {
+              setMovieList([...result.Search]);
+            }
+          }
+
+          if (result.totalResults) {
+            setTotalResultsFound(Number(result.totalResults));
           }
         }
 
-        if (result.totalResults) {
-          setTotalResultsFound(Number(result.totalResults));
-        }
+        setIsLoadingMore(false);
+        globalAction?.setLoading(false);
+      } catch (err) {
+        console.log("[searchMovies err]", err);
+        setIsLoadingMore(false);
+        globalAction?.setLoading(false);
       }
-
-      setIsLoadingMore(false);
     }
   };
 
   const handleSearch = () => {
+    globalAction?.setLoading(true);
     onSearch(searchTitle, page);
   };
 
@@ -96,6 +168,7 @@ const MovieList = () => {
     }
   }, []);
 
+  // Add listener
   useEffect(() => {
     window.addEventListener("scroll", handleWindowScroll);
 
@@ -104,13 +177,14 @@ const MovieList = () => {
     };
   }, [handleWindowScroll]);
 
+  // Handle scroll to the end event
   useEffect(() => {
     if (
       isTouchedTheEnd &&
       !isLoadingMore &&
       searchTitle &&
       totalResultsFound &&
-      totalResultsFound > movieList.length
+      totalResultsFound > movieList?.length
     ) {
       setIsTouchedTheEnd(false);
       handleLoadMoreThrottle(isLoadingMore, searchTitle, page);
@@ -121,14 +195,18 @@ const MovieList = () => {
     searchTitle,
     page,
     totalResultsFound,
-    movieList.length,
+    movieList?.length,
     handleLoadMoreThrottle,
   ]);
+
+  useEffect(() => {
+    cacheData();
+  }, [searchTitle, movieList, totalResultsFound]);
 
   return (
     <div className="px-5 text-[#999999]">
       <h1 className="text-center text-3xl">Movie List</h1>
-      <div className="mt-6 mb-8 w-full">
+      <div className="mt-6 mb-4 w-full">
         <Search
           value={searchTitle}
           placeHolder="Search for movies"
@@ -143,18 +221,27 @@ const MovieList = () => {
       <div>
         {searchTitle && (
           <div>
-            {movieList.length > 0 ? (
+            {movieList?.length > 0 ? (
               <div>
-                <div className="text-xl">{`Result for '${searchTitle}':`}</div>
+                <div className="text-xl mb-2">{`Result for '${searchTitle}':`}</div>
 
-                <div ref={moveListContainerRef} className="mt-2 grid gap-8">
+                <div
+                  ref={moveListContainerRef}
+                  className="mt-2 flex flex-wrap justify-center gap-8"
+                >
                   {movieList.map((movie) => {
-                    return <MovieCardItem key={movie.Title} movie={movie} />;
+                    return (
+                      <MovieCardItem
+                        key={movie.Title}
+                        movie={movie}
+                        onClick={onClickCard}
+                      />
+                    );
                   })}
                 </div>
 
                 {isLoadingMore && (
-                  <div className="flex justify-center mt-2">
+                  <div className="flex justify-center my-4">
                     <LoadingMore />
                   </div>
                 )}
