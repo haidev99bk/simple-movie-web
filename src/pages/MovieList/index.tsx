@@ -6,7 +6,10 @@ import {
   useRef,
   useState,
 } from "react";
-import movieService, { MovieListItem } from "../../service/movie.service";
+import movieService, {
+  MovieListItem,
+  Response,
+} from "../../service/movie.service";
 import Search from "../../components/Search";
 import { debounce, throttle } from "lodash";
 import LoadingMore from "../../components/LoadingMore";
@@ -15,6 +18,7 @@ import { SessionStorageKeys } from "../../constants/sessionStoreKeys";
 import { RouterPaths } from "../../routers";
 import { useNavigate } from "react-router-dom";
 import GlobalContext from "../../context/global";
+import useBrowserListener from "../../hooks/useBrowserListener";
 
 const MAX_PAGE = 100;
 
@@ -26,7 +30,7 @@ const MovieList = () => {
     const movieCache = sessionStorage.getItem(
       SessionStorageKeys.MOVIE_LIST_CACHE
     );
-    return movieCache ? JSON.parse(movieCache) : undefined;
+    return movieCache ? JSON.parse(movieCache) : {};
   }, []);
 
   const [searchTitle, setSearchTitle] = useState(cached.searchTitle || "");
@@ -81,7 +85,7 @@ const MovieList = () => {
       try {
         const result = await movieService.searchMovies(searchTitle, page);
 
-        if (result?.Response === "False") {
+        if (result?.Response === Response.FALSE) {
           if (result?.Error) {
             setError(result.Error);
           }
@@ -113,18 +117,19 @@ const MovieList = () => {
     }
   };
 
-  const handleSearch = debounce(() => {
-    globalAction?.setLoading(true);
-    findMovie(searchTitle, page);
-  }, 500);
-
   const handleDeleteSearch = () => {
     setSearchTitle("");
+    resetFoundData();
   };
 
   const onClickCard = (id: string) => {
     navigate(`${RouterPaths.MOVIE_DETAILS}/${id}`);
   };
+
+  const handleSearch = debounce(() => {
+    globalAction?.setLoading(true);
+    findMovie(searchTitle, page, false);
+  }, 500);
 
   const handleLoadMore = async (
     isLoadingMore: boolean,
@@ -160,14 +165,14 @@ const MovieList = () => {
     }
   }, []);
 
-  // Add listener
-  useEffect(() => {
-    window.addEventListener("scroll", handleWindowScroll);
+  const handleWindowReload = useCallback(() => {
+    clearCache();
+    setSearchTitle("");
+  }, []);
 
-    return () => {
-      window.removeEventListener("scroll", handleWindowScroll);
-    };
-  }, [handleWindowScroll]);
+  // Add listener
+  useBrowserListener("scroll", handleWindowScroll);
+  useBrowserListener("load", handleWindowReload);
 
   // Handle scroll to the end event
   useEffect(() => {
@@ -176,13 +181,16 @@ const MovieList = () => {
       !isLoadingMore &&
       searchTitle &&
       totalResultsFound &&
-      totalResultsFound > movieList?.length
+      totalResultsFound > movieList?.length &&
+      page <= MAX_PAGE
     ) {
       setIsTouchedTheEnd(false);
+      setIsLoadingMore(true);
       handleLoadMoreThrottle(isLoadingMore, searchTitle, page);
     }
   }, [isTouchedTheEnd]);
 
+  // update cache data
   useEffect(() => {
     cacheData();
   }, [movieList, totalResultsFound]);
