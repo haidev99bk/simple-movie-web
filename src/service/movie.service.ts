@@ -5,8 +5,13 @@ const API_KEY = "b9bd48a6";
 export interface MovieListResponse {
   Search: MovieListItem[];
   totalResults: string;
-  Response: "True" | "False";
+  Response: Response;
   Error?: string;
+}
+
+export enum Response {
+  TRUE = "True",
+  FALSE = "False",
 }
 
 export interface MovieListItem {
@@ -55,7 +60,7 @@ export interface MovieDetails {
   BoxOffice: string;
   Production: string;
   Website: string;
-  Response: "True" | "False";
+  Response: Response;
   Error?: string;
 }
 

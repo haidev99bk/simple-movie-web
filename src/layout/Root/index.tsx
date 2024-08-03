@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Outlet } from "react-router-dom";
 import Logo from "../../assets/logo.png";
 import MenuIcon from "../../assets/menu-icon.gif";
@@ -6,6 +6,7 @@ import GlobalContext from "../../context/global";
 import { MovieListItem } from "../../service/movie.service";
 import LoadingOverlay from "../../components/LoadingOverlay";
 import ScrollTopIcon from "../../assets/scroll-top-icon.svg";
+import useBrowserListener from "../../hooks/useBrowserListener";
 
 const Root = () => {
   const [loading, setLoading] = useState(false);
@@ -40,13 +41,7 @@ const Root = () => {
     }
   }, []);
 
-  useEffect(() => {
-    window.addEventListener("scroll", handleScroll);
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-    };
-  }, []);
+  useBrowserListener("scroll", handleScroll);
 
   return (
     <GlobalContext.Provider value={{ globalValue, globalAction }}>

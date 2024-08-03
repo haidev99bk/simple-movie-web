@@ -1,14 +1,22 @@
 import React, { useEffect, useState } from "react";
 import SearchIcon from "../../assets/search-icon.svg";
+import CloseIcon from "../../assets/close.svg";
 
 type SearchProps = {
   placeHolder?: string;
   value: string;
   onChange: (value: string) => void;
   onSearch?: () => void;
+  onDelete?: () => void;
 };
 
-const Search = ({ placeHolder, value, onChange, onSearch }: SearchProps) => {
+const Search = ({
+  placeHolder,
+  value,
+  onChange,
+  onSearch,
+  onDelete,
+}: SearchProps) => {
   const [text, setText] = useState(value);
   const [isFocused, setIsFocused] = useState(false);
 
@@ -49,6 +57,15 @@ const Search = ({ placeHolder, value, onChange, onSearch }: SearchProps) => {
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
       />
+
+      {text && onDelete && (
+        <div
+          className="flex items-center justify-center hover:cursor-pointer"
+          onClick={onDelete}
+        >
+          <img className="h-4" src={CloseIcon} />
+        </div>
+      )}
 
       <div
         className="flex items-center justify-center hover:cursor-pointer"

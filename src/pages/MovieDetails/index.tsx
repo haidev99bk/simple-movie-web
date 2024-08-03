@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import movieService, {
   MovieDetails as MovieDetailsType,
+  Response,
 } from "../../service/movie.service";
 import BackArrowIcon from "../../assets/back-arrow-navigation.svg";
 import { RouterPaths } from "../../routers";
@@ -23,7 +24,7 @@ const MovieDetails = () => {
     try {
       const result = await movieService.getMovieDetails(movieId as string);
 
-      if (result.Response === "True") {
+      if (result.Response === Response.TRUE) {
         setMovieDetails(result);
       } else {
         if (result.Error) {
