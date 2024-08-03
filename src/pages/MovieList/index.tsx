@@ -8,7 +8,7 @@ import {
 } from "react";
 import movieService, { MovieListItem } from "../../service/movie.service";
 import Search from "../../components/Search";
-import { throttle } from "lodash";
+import { debounce, throttle } from "lodash";
 import LoadingMore from "../../components/LoadingMore";
 import MovieCardItem from "../../components/MovieCardItem";
 import { SessionStorageKeys } from "../../constants/sessionStoreKeys";
@@ -23,80 +23,60 @@ const MovieList = () => {
   const navigate = useNavigate();
 
   const cached = useMemo(() => {
-    const searchTitle =
-      sessionStorage.getItem(SessionStorageKeys.SEARCH_TITLE) !== "undefined"
-        ? JSON.parse(
-            sessionStorage.getItem(SessionStorageKeys.SEARCH_TITLE) as string
-          )
-        : "";
-
-    const totalResultsFound =
-      sessionStorage.getItem(SessionStorageKeys.TOTAL_FOUND) !== "undefined"
-        ? JSON.parse(
-            sessionStorage.getItem(SessionStorageKeys.TOTAL_FOUND) as string
-          )
-        : "";
-
-    const movieList =
-      sessionStorage.getItem(SessionStorageKeys.MOVIE_LIST) !== "undefined"
-        ? JSON.parse(
-            sessionStorage.getItem(SessionStorageKeys.MOVIE_LIST) as string
-          )
-        : "";
-
-    return { searchTitle, totalResultsFound, movieList };
-  }, [location.pathname]);
+    const movieCache = sessionStorage.getItem(
+      SessionStorageKeys.MOVIE_LIST_CACHE
+    );
+    return movieCache ? JSON.parse(movieCache) : undefined;
+  }, []);
 
   const [searchTitle, setSearchTitle] = useState(cached.searchTitle || "");
   const [movieList, setMovieList] = useState<MovieListItem[]>(cached.movieList);
   const [totalResultsFound, setTotalResultsFound] = useState<
     number | undefined
   >(Number(cached.totalResultsFound) || 0);
-  const [error, setError] = useState("");
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(cached.page ? Number(cached.page) : 1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [isTouchedTheEnd, setIsTouchedTheEnd] = useState(false);
+  const [error, setError] = useState("");
 
   const moveListContainerRef = useRef<HTMLDivElement>(null);
 
   const cacheData = () => {
     sessionStorage.setItem(
-      SessionStorageKeys.MOVIE_LIST,
-      JSON.stringify(movieList)
-    );
-
-    sessionStorage.setItem(
-      SessionStorageKeys.SEARCH_TITLE,
-      JSON.stringify(searchTitle)
-    );
-
-    sessionStorage.setItem(
-      SessionStorageKeys.TOTAL_FOUND,
-      JSON.stringify(totalResultsFound)
+      SessionStorageKeys.MOVIE_LIST_CACHE,
+      JSON.stringify({
+        movieList,
+        searchTitle,
+        totalResultsFound,
+        page,
+      })
     );
   };
 
   const clearCache = () => {
-    sessionStorage.removeItem(SessionStorageKeys.MOVIE_LIST);
-
-    sessionStorage.removeItem(SessionStorageKeys.SEARCH_TITLE);
-
-    sessionStorage.removeItem(SessionStorageKeys.TOTAL_FOUND);
+    sessionStorage.removeItem(SessionStorageKeys.MOVIE_LIST_CACHE);
   };
 
-  const onClickCard = (id: string) => {
-    navigate(`${RouterPaths.MOVIE_DETAILS}/${id}`);
+  const resetFoundData = () => {
+    setMovieList([]);
+    setTotalResultsFound(undefined);
+    setError("");
+    setPage(1);
+
+    clearCache();
   };
 
   const onSearchChange = (title: string) => {
     setSearchTitle(title);
-    setMovieList([]);
-    setTotalResultsFound(undefined);
-    setError("");
-    clearCache();
+
+    resetFoundData();
   };
 
-  const onSearch = async (searchTitle: string, page = 1) => {
+  const findMovie = async (
+    searchTitle: string,
+    page = 1,
+    isLoadMore = false
+  ) => {
     if (searchTitle) {
       try {
         const result = await movieService.searchMovies(searchTitle, page);
@@ -107,10 +87,14 @@ const MovieList = () => {
           }
         } else {
           if (result?.Search?.length > 0) {
-            if (page > 1) {
-              setMovieList((prev) => [...prev, ...result.Search]);
-            } else {
+            const isFirstTime = page === 1;
+
+            if (isFirstTime) {
               setMovieList([...result.Search]);
+            } else {
+              if (isLoadMore) {
+                setMovieList((prev) => [...prev, ...result.Search]);
+              }
             }
           }
 
@@ -129,27 +113,35 @@ const MovieList = () => {
     }
   };
 
-  const handleSearch = () => {
+  const handleSearch = debounce(() => {
     globalAction?.setLoading(true);
-    onSearch(searchTitle, page);
+    findMovie(searchTitle, page);
+  }, 500);
+
+  const handleDeleteSearch = () => {
+    setSearchTitle("");
   };
 
-  async function handleLoadMore(
+  const onClickCard = (id: string) => {
+    navigate(`${RouterPaths.MOVIE_DETAILS}/${id}`);
+  };
+
+  const handleLoadMore = async (
     isLoadingMore: boolean,
     searchTitle: string,
     page: number
-  ) {
+  ) => {
     if (page <= MAX_PAGE) {
       if (!isLoadingMore && searchTitle) {
         setIsLoadingMore(true);
-        await onSearch(searchTitle, page + 1);
+        await findMovie(searchTitle, page + 1, true);
 
         setIsTouchedTheEnd(false);
-        setPage((prev) => prev + 1);
+        setPage((prev: number) => prev + 1);
       }
     }
     setIsTouchedTheEnd(false);
-  }
+  };
 
   const handleLoadMoreThrottle = useMemo(
     () => throttle(handleLoadMore, 2000),
@@ -189,19 +181,11 @@ const MovieList = () => {
       setIsTouchedTheEnd(false);
       handleLoadMoreThrottle(isLoadingMore, searchTitle, page);
     }
-  }, [
-    isTouchedTheEnd,
-    isLoadingMore,
-    searchTitle,
-    page,
-    totalResultsFound,
-    movieList?.length,
-    handleLoadMoreThrottle,
-  ]);
+  }, [isTouchedTheEnd]);
 
   useEffect(() => {
     cacheData();
-  }, [searchTitle, movieList, totalResultsFound]);
+  }, [movieList, totalResultsFound]);
 
   return (
     <div className="px-5 text-[#999999]">
@@ -212,6 +196,7 @@ const MovieList = () => {
           placeHolder="Search for movies"
           onChange={onSearchChange}
           onSearch={handleSearch}
+          onDelete={handleDeleteSearch}
         />
         <div className="italic ml-2 mt-2 my-8 text-xs text-[#9999997d] font-sans">
           Input movie title( eg: "Spider man") then enter

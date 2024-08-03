@@ -9,8 +9,12 @@ const MovieDetailsCard = ({ movieDetails }: MovieDetailsCardProps) => {
     <div>
       <h1 className="font-bold text-3xl text-white">{movieDetails.Title}</h1>
       <div className="md:flex md:p-5">
-        <div className="rounded-3xl w-full md:flex-1 mr-5 overflow-auto">
-          <img className="w-full mt-2" src={movieDetails.Poster} alt="poster" />
+        <div className="flex justify-center w-full mr-5 max-h-[70vh] overflow-auto md:flex-1 md:justify-end md:rounded-none">
+          <img
+            className="md:object-contain md:object-right mt-2 object-fill object-center"
+            src={movieDetails.Poster}
+            alt="poster"
+          />
         </div>
 
         <div className="md:flex-1 flex flex-col  gap-2 mt-4 w-full">
